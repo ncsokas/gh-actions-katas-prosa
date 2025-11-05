@@ -1,0 +1,317 @@
+name: Debugging and Logging Demo
+
+# This workflow demonstrates various GitHub Actions debugging and logging capabilities
+# Environment variables ACTIONS_RUNNER_DEBUG and ACTIONS_STEP_DEBUG should be set to 'true'
+# in your repository environment settings for enhanced debugging output
+
+on:
+  workflow_dispatch:
+    inputs:
+      log_level:
+        description: 'Log level for demo'
+        required: false
+        default: 'info'
+        type: choice
+        options:
+          - debug
+          - info
+          - warning
+          - error
+      simulate_failure:
+        description: 'Simulate a failure for error handling demo'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  DEMO_VERSION: "1.0.0"
+  ENVIRONMENT: "test"
+
+jobs:
+  basic-logging-demo:
+    name: Basic Logging Demonstrations
+    runs-on: ubuntu-latest
+    environment: test
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Basic Echo Commands
+        run: |
+          echo "Starting basic logging demonstration..."
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit SHA: ${{ github.sha }}"
+      
+      - name: Debug Messages Demo
+        run: |
+          echo "::debug::This is a debug message - only visible when ACTIONS_STEP_DEBUG=true"
+          echo "::debug::Current working directory: $(pwd)"
+          echo "::debug::Available disk space: $(df -h /)"
+          echo "::debug::Environment variables count: $(env | wc -l)"
+      
+      - name: Warning Messages Demo
+        run: |
+          echo "::warning::This is a warning message - appears prominently in logs"
+          echo "::warning file=demo-file.txt,line=42,col=5::File-specific warning with location"
+          echo "::warning title=Configuration Warning::Using default configuration values"
+      
+      - name: Error Messages Demo (Non-failing)
+        run: |
+          echo "::error::This is an error message - highly visible in logs"
+          echo "::error file=config.yml,line=15::Missing required configuration"
+          echo "::error title=Validation Error::Invalid input parameter detected"
+          echo "Note: These errors don't fail the step - they're just for demonstration"
+
+  workflow-commands-demo:
+    name: Workflow Commands Demonstration
+    runs-on: ubuntu-latest
+    environment: test
+    needs: basic-logging-demo
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Environment Variables Demo
+        run: |
+          echo "::group::Setting Environment Variables"
+          echo "DEMO_VAR=Hello from workflow command" >> $GITHUB_ENV
+          echo "BUILD_NUMBER=${{ github.run_number }}" >> $GITHUB_ENV
+          echo "TIMESTAMP=$(date -Iseconds)" >> $GITHUB_ENV
+          echo "::endgroup::"
+      
+      - name: Using Set Environment Variables
+        run: |
+          echo "Demo variable: $DEMO_VAR"
+          echo "Build number: $BUILD_NUMBER"
+          echo "Timestamp: $TIMESTAMP"
+      
+      - name: Path Modification Demo
+        run: |
+          echo "::group::Current PATH"
+          echo "$PATH"
+          echo "::endgroup::"
+          
+          # Add a custom directory to PATH
+          mkdir -p /tmp/demo-bin
+          echo '#!/bin/bash' > /tmp/demo-bin/demo-tool
+          echo 'echo "Demo tool executed successfully!"' >> /tmp/demo-bin/demo-tool
+          chmod +x /tmp/demo-bin/demo-tool
+          echo "/tmp/demo-bin" >> $GITHUB_PATH
+      
+      - name: Test Modified PATH
+        run: |
+          echo "::group::Testing modified PATH"
+          which demo-tool
+          demo-tool
+          echo "::endgroup::"
+      
+      - name: Masking Sensitive Data Demo
+        run: |
+          FAKE_SECRET="super-secret-password-123"
+          echo "::add-mask::$FAKE_SECRET"
+          echo "The secret value is: $FAKE_SECRET"
+          echo "This line contains the secret: $FAKE_SECRET and it should be masked"
+      
+      - name: Job Summary Demo
+        run: |
+          echo "# Workflow Demo Summary 📋" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Execution Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Input Parameters" >> $GITHUB_STEP_SUMMARY
+          echo "- **Log Level:** ${{ inputs.log_level }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Simulate Failure:** ${{ inputs.simulate_failure }}" >> $GITHUB_STEP_SUMMARY
+
+  log-grouping-demo:
+    name: Log Grouping and Organization
+    runs-on: ubuntu-latest
+    environment: test
+    needs: workflow-commands-demo
+    
+    steps:
+      - name: Grouped Output Demo
+        run: |
+          echo "::group::System Information"
+          echo "Operating System: $(uname -a)"
+          echo "CPU Info: $(nproc) cores"
+          echo "Memory: $(free -h)"
+          echo "::endgroup::"
+          
+          echo "::group::Environment Setup"
+          echo "Setting up demo environment..."
+          sleep 2
+          echo "Installing dependencies..."
+          sleep 1
+          echo "Configuring application..."
+          sleep 1
+          echo "Environment setup complete!"
+          echo "::endgroup::"
+          
+          echo "::group::File System Analysis"
+          echo "Current directory contents:"
+          ls -la
+          echo ""
+          echo "Disk usage:"
+          du -sh .
+          echo "::endgroup::"
+      
+      - name: Nested Groups Demo
+        run: |
+          echo "::group::Main Process"
+          echo "Starting main process..."
+          
+          echo "::group::Sub-process A"
+          echo "Executing sub-process A..."
+          echo "Sub-process A completed"
+          echo "::endgroup::"
+          
+          echo "::group::Sub-process B"
+          echo "Executing sub-process B..."
+          echo "Sub-process B completed"
+          echo "::endgroup::"
+          
+          echo "Main process completed!"
+          echo "::endgroup::"
+
+  advanced-commands-demo:
+    name: Advanced Workflow Commands
+    runs-on: ubuntu-latest
+    environment: test
+    needs: log-grouping-demo
+    
+    steps:
+      - name: Stop/Resume Commands Demo
+        run: |
+          echo "Regular logging is active"
+          echo "::stop-commands::pause-token-123"
+          echo "::warning::This warning should NOT appear in logs"
+          echo "::error::This error should NOT appear in logs"
+          echo "This text will appear but without command processing"
+          echo "::resume-commands::pause-token-123"
+          echo "::notice::Command processing resumed - this notice should appear"
+      
+      - name: Output Parameters Demo
+        id: demo-outputs
+        run: |
+          # Modern way to set outputs
+          echo "current-time=$(date -Iseconds)" >> $GITHUB_OUTPUT
+          echo "random-number=$RANDOM" >> $GITHUB_OUTPUT
+          echo "demo-result=success" >> $GITHUB_OUTPUT
+          
+          # Also demonstrate the legacy way (for educational purposes)
+          echo "::notice::Modern output setting demonstrated above"
+      
+      - name: Using Output Parameters
+        run: |
+          echo "::group::Output Parameters from Previous Step"
+          echo "Current Time: ${{ steps.demo-outputs.outputs.current-time }}"
+          echo "Random Number: ${{ steps.demo-outputs.outputs.random-number }}"
+          echo "Demo Result: ${{ steps.demo-outputs.outputs.demo-result }}"
+          echo "::endgroup::"
+      
+      - name: State Management Demo
+        run: |
+          # Save state for post-action cleanup
+          echo "cleanup-required=true" >> $GITHUB_STATE
+          echo "temp-files=/tmp/demo-*" >> $GITHUB_STATE
+          echo "::notice::State saved for potential cleanup"
+
+  conditional-logging-demo:
+    name: Conditional Logging Based on Input
+    runs-on: ubuntu-latest
+    environment: test
+    needs: advanced-commands-demo
+    
+    steps:
+      - name: Log Level Based Messages
+        run: |
+          case "${{ inputs.log_level }}" in
+            "debug")
+              echo "::debug::Debug level selected - showing detailed information"
+              echo "::debug::All system details will be logged"
+              ;;
+            "info")
+              echo "::notice::Info level selected - showing normal information"
+              ;;
+            "warning")
+              echo "::warning::Warning level selected - showing warnings and errors only"
+              ;;
+            "error")
+              echo "::error::Error level selected - showing errors only"
+              ;;
+          esac
+      
+      - name: Conditional Failure Simulation
+        if: ${{ inputs.simulate_failure == true }}
+        run: |
+          echo "::error::Simulating failure as requested"
+          echo "::group::Failure Analysis"
+          echo "This step demonstrates error handling and logging"
+          echo "In a real scenario, this might be a test failure or build error"
+          echo "::endgroup::"
+          exit 1
+      
+      - name: Success Path
+        if: ${{ inputs.simulate_failure == false }}
+        run: |
+          echo "::notice::Workflow completed successfully!"
+          echo "::group::Success Summary"
+          echo "✅ All logging demonstrations completed"
+          echo "✅ All workflow commands executed"
+          echo "✅ No errors simulated"
+          echo "::endgroup::"
+
+  github-cli-integration:
+    name: GitHub CLI Integration Demo
+    runs-on: ubuntu-latest
+    environment: test
+    needs: conditional-logging-demo
+    if: ${{ always() && inputs.simulate_failure == false }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: GitHub CLI Workflow Information
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "::group::GitHub CLI Demonstration"
+          echo "Repository information:"
+          gh repo view --json name,description,url,defaultBranch
+          
+          echo ""
+          echo "Recent workflow runs:"
+          gh run list --limit 5 --json status,conclusion,createdAt,displayTitle
+          echo "::endgroup::"
+      
+      - name: Create Final Summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "## 🎉 Debugging and Logging Demo Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### What was demonstrated:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Basic logging with echo commands" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Debug, warning, and error messages" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Environment variable setting" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ PATH modification" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Sensitive data masking" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Log grouping and organization" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Output parameters" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Command stopping/resuming" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Conditional execution" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ GitHub CLI integration" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Environment Variables Used:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`ACTIONS_RUNNER_DEBUG=true\` - Enhanced runner debugging" >> $GITHUB_STEP_SUMMARY
+          echo "- \`ACTIONS_STEP_DEBUG=true\` - Step-level debugging" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 **Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
