@@ -285,7 +285,7 @@ jobs:
         run: |
           echo "::group::GitHub CLI Demonstration"
           echo "Repository information:"
-          gh repo view --json name,description,url,defaultBranch
+          gh repo view --json name,description,url,defaultBranchRef
           
           echo ""
           echo "Recent workflow runs:"
